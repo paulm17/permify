@@ -5,6 +5,7 @@ type Engine string
 
 const (
 	POSTGRES Engine = "postgres"
+	YUGABYTE Engine = "yugabyte"
 	MEMORY   Engine = "memory"
 )
 

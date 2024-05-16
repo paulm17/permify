@@ -4,9 +4,11 @@ import (
 	"github.com/Permify/permify/internal/storage"
 	MMRepository "github.com/Permify/permify/internal/storage/memory"
 	PQRepository "github.com/Permify/permify/internal/storage/postgres"
+	YBRepository "github.com/Permify/permify/internal/storage/yugabyte"
 	"github.com/Permify/permify/pkg/database"
 	MMDatabase "github.com/Permify/permify/pkg/database/memory"
 	PQDatabase "github.com/Permify/permify/pkg/database/postgres"
+	YBDatabase "github.com/Permify/permify/pkg/database/yugabyte"
 )
 
 // DataReaderFactory creates and returns a DataReader based on the database engine type.
@@ -15,6 +17,9 @@ func DataReaderFactory(db database.Database) (repo storage.DataReader) {
 	case "postgres":
 		// If the database engine is Postgres, create a new DataReader using the Postgres implementation
 		return PQRepository.NewDataReader(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the database engine is Postgres, create a new DataReader using the Postgres implementation
+		return YBRepository.NewDataReader(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the database engine is in-memory, create a new DataReader using the in-memory implementation
 		return MMRepository.NewDataReader(db.(*MMDatabase.Memory))
@@ -30,6 +35,9 @@ func DataWriterFactory(db database.Database) (repo storage.DataWriter) {
 	case "postgres":
 		// If the database engine is Postgres, create a new DataWriter using the Postgres implementation
 		return PQRepository.NewDataWriter(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the database engine is Postgres, create a new DataWriter using the Postgres implementation
+		return YBRepository.NewDataWriter(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the database engine is in-memory, create a new DataWriter using the in-memory implementation
 		return MMRepository.NewDataWriter(db.(*MMDatabase.Memory))
@@ -45,6 +53,9 @@ func SchemaReaderFactory(db database.Database) (repo storage.SchemaReader) {
 	case "postgres":
 		// If the database engine is Postgres, create a new SchemaReader using the Postgres implementation
 		return PQRepository.NewSchemaReader(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the database engine is Postgres, create a new SchemaReader using the Postgres implementation
+		return YBRepository.NewSchemaReader(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the database engine is in-memory, create a new SchemaReader using the in-memory implementation
 		return MMRepository.NewSchemaReader(db.(*MMDatabase.Memory))
@@ -60,6 +71,9 @@ func WatcherFactory(db database.Database) (repo storage.Watcher) {
 	case "postgres":
 		// If the database engine is Postgres, create a new Watcher using the Postgres implementation
 		return PQRepository.NewWatcher(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the database engine is Postgres, create a new Watcher using the Postgres implementation
+		return YBRepository.NewWatcher(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the database engine is in-memory, create a new Watcher using the in-memory implementation
 		return MMRepository.NewWatcher(db.(*MMDatabase.Memory))
@@ -75,6 +89,9 @@ func SchemaWriterFactory(db database.Database) (repo storage.SchemaWriter) {
 	case "postgres":
 		// If the database engine is Postgres, create a new SchemaWriter using the Postgres implementation
 		return PQRepository.NewSchemaWriter(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the database engine is Postgres, create a new SchemaWriter using the Postgres implementation
+		return YBRepository.NewSchemaWriter(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the database engine is in-memory, create a new SchemaWriter using the in-memory implementation
 		return MMRepository.NewSchemaWriter(db.(*MMDatabase.Memory))
@@ -90,6 +107,9 @@ func TenantReaderFactory(db database.Database) (repo storage.TenantReader) {
 	case "postgres":
 		// If the database engine is Postgres, create a new TenantReader using the Postgres implementation
 		return PQRepository.NewTenantReader(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the database engine is Postgres, create a new TenantReader using the Postgres implementation
+		return YBRepository.NewTenantReader(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the database engine is in-memory, create a new TenantReader using the in-memory implementation
 		return MMRepository.NewTenantReader(db.(*MMDatabase.Memory))
@@ -105,6 +125,9 @@ func TenantWriterFactory(db database.Database) (repo storage.TenantWriter) {
 	case "postgres":
 		// If the database engine is Postgres, create a new TenantWriter using the Postgres implementation
 		return PQRepository.NewTenantWriter(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the database engine is Postgres, create a new TenantWriter using the Postgres implementation
+		return YBRepository.NewTenantWriter(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the database engine is in-memory, create a new TenantWriter using the in-memory implementation
 		return MMRepository.NewTenantWriter(db.(*MMDatabase.Memory))
@@ -122,6 +145,9 @@ func BundleReaderFactory(db database.Database) (repo storage.BundleReader) {
 	case "postgres":
 		// If the engine type is "postgres", create and return a PostgreSQL specific BundleReader.
 		return PQRepository.NewBundleReader(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the engine type is "postgres", create and return a PostgreSQL specific BundleReader.
+		return YBRepository.NewBundleReader(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the engine type is "memory", create and return a memory-based BundleReader.
 		return MMRepository.NewBundleReader(db.(*MMDatabase.Memory))
@@ -139,6 +165,9 @@ func BundleWriterFactory(db database.Database) (repo storage.BundleWriter) {
 	case "postgres":
 		// If the engine type is "postgres", create and return a PostgreSQL specific BundleWriter.
 		return PQRepository.NewBundleWriter(db.(*PQDatabase.Postgres))
+	case "yugabyte":
+		// If the engine type is "postgres", create and return a PostgreSQL specific BundleWriter.
+		return YBRepository.NewBundleWriter(db.(*YBDatabase.Yugabyte))
 	case "memory":
 		// If the engine type is "memory", create and return a memory-based BundleWriter.
 		return MMRepository.NewBundleWriter(db.(*MMDatabase.Memory))

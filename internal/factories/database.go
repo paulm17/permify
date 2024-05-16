@@ -5,10 +5,12 @@ import (
 
 	"github.com/Permify/permify/internal/config"
 	"github.com/Permify/permify/internal/storage/memory/migrations"
-	"github.com/Permify/permify/internal/storage/postgres/utils"
+	pgutils "github.com/Permify/permify/internal/storage/postgres/utils"
+	ybutils "github.com/Permify/permify/internal/storage/yugabyte/utils"
 	"github.com/Permify/permify/pkg/database"
 	IMDatabase "github.com/Permify/permify/pkg/database/memory"
 	PQDatabase "github.com/Permify/permify/pkg/database/postgres"
+	YBDatabase "github.com/Permify/permify/pkg/database/yugabyte"
 )
 
 // DatabaseFactory is a factory function that creates a database instance according to the given configuration.
@@ -62,7 +64,44 @@ func DatabaseFactory(conf config.Database) (db database.Database, err error) {
 		}
 
 		// check postgres version
-		_, err = utils.EnsureDBVersion(db.(*PQDatabase.Postgres).ReadPool)
+		_, err = pgutils.EnsureDBVersion(db.(*PQDatabase.Postgres).ReadPool)
+		if err != nil {
+			return nil, err
+		}
+
+		return
+	case database.YUGABYTE.String():
+
+		if conf.URI == "" {
+			db, err = YBDatabase.NewWithSeparateURIs(conf.Writer.URI, conf.Reader.URI,
+				YBDatabase.MaxOpenConnections(conf.MaxOpenConnections),
+				YBDatabase.MaxIdleConnections(conf.MaxIdleConnections),
+				YBDatabase.MaxConnectionIdleTime(conf.MaxConnectionIdleTime),
+				YBDatabase.MaxConnectionLifeTime(conf.MaxConnectionLifetime),
+				YBDatabase.WatchBufferSize(conf.WatchBufferSize),
+				YBDatabase.MaxDataPerWrite(conf.MaxDataPerWrite),
+				YBDatabase.MaxRetries(conf.MaxRetries),
+			)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			db, err = YBDatabase.New(conf.URI,
+				YBDatabase.MaxOpenConnections(conf.MaxOpenConnections),
+				YBDatabase.MaxIdleConnections(conf.MaxIdleConnections),
+				YBDatabase.MaxConnectionIdleTime(conf.MaxConnectionIdleTime),
+				YBDatabase.MaxConnectionLifeTime(conf.MaxConnectionLifetime),
+				YBDatabase.WatchBufferSize(conf.WatchBufferSize),
+				YBDatabase.MaxDataPerWrite(conf.MaxDataPerWrite),
+				YBDatabase.MaxRetries(conf.MaxRetries),
+			)
+			if err != nil {
+				return nil, err
+			}
+		}
+
+		// check postgres version
+		_, err = ybutils.EnsureDBVersion(db.(*YBDatabase.Yugabyte).ReadPool)
 		if err != nil {
 			return nil, err
 		}

@@ -22,9 +22,11 @@ import (
 	cacheDecorator "github.com/Permify/permify/internal/storage/decorators/cache"
 	cbDecorator "github.com/Permify/permify/internal/storage/decorators/circuitBreaker"
 	sfDecorator "github.com/Permify/permify/internal/storage/decorators/singleflight"
-	"github.com/Permify/permify/internal/storage/postgres/gc"
+	pggc "github.com/Permify/permify/internal/storage/postgres/gc"
+	ybgc "github.com/Permify/permify/internal/storage/yugabyte/gc"
 	"github.com/Permify/permify/pkg/cmd/flags"
 	PQDatabase "github.com/Permify/permify/pkg/database/postgres"
+	YBDatabase "github.com/Permify/permify/pkg/database/yugabyte"
 
 	"go.opentelemetry.io/otel/sdk/trace"
 	"golang.org/x/sync/errgroup"
@@ -100,7 +102,7 @@ func NewServeCommand() *cobra.Command {
 	f.Int("service-permission-concurrency-limit", conf.Service.Permission.ConcurrencyLimit, "concurrency limit")
 	f.Int64("service-permission-cache-number-of-counters", conf.Service.Permission.Cache.NumberOfCounters, "permission service cache number of counters")
 	f.String("service-permission-cache-max-cost", conf.Service.Permission.Cache.MaxCost, "permission service cache max cost")
-	f.String("database-engine", conf.Database.Engine, "data source. e.g. postgres, memory")
+	f.String("database-engine", conf.Database.Engine, "data source. e.g. yugabyte, postgres, memory")
 	f.String("database-uri", conf.Database.URI, "uri of your data source to store relation tuples and schema")
 	f.String("database-writer-uri", conf.Database.Writer.URI, "writer uri of your data source to store relation tuples and schema")
 	f.String("database-reader-uri", conf.Database.Reader.URI, "reader uri of your data source to store relation tuples and schema")
@@ -261,19 +263,35 @@ func serve() func(cmd *cobra.Command, args []string) error {
 		if cfg.Database.GarbageCollection.Timeout > 0 && cfg.Database.GarbageCollection.Enabled && cfg.Database.Engine != "memory" {
 			slog.Info("🗑️ starting database garbage collection...")
 
-			garbageCollector := gc.NewGC(
-				db.(*PQDatabase.Postgres),
-				gc.Interval(cfg.Database.GarbageCollection.Interval),
-				gc.Window(cfg.Database.GarbageCollection.Window),
-				gc.Timeout(cfg.Database.GarbageCollection.Timeout),
-			)
+			if cfg.Database.Engine == "postgres" {
+				garbageCollector := pggc.NewGC(
+					db.(*PQDatabase.Postgres),
+					pggc.Interval(cfg.Database.GarbageCollection.Interval),
+					pggc.Window(cfg.Database.GarbageCollection.Window),
+					pggc.Timeout(cfg.Database.GarbageCollection.Timeout),
+				)
 
-			go func() {
-				err = garbageCollector.Start(ctx)
-				if err != nil {
-					slog.Error(err.Error())
-				}
-			}()
+				go func() {
+					err = garbageCollector.Start(ctx)
+					if err != nil {
+						slog.Error(err.Error())
+					}
+				}()
+			} else if cfg.Database.Engine == "yugabyte" {
+				garbageCollector := ybgc.NewGC(
+					db.(*YBDatabase.Yugabyte),
+					ybgc.Interval(cfg.Database.GarbageCollection.Interval),
+					ybgc.Window(cfg.Database.GarbageCollection.Window),
+					ybgc.Timeout(cfg.Database.GarbageCollection.Timeout),
+				)
+
+				go func() {
+					err = garbageCollector.Start(ctx)
+					if err != nil {
+						slog.Error(err.Error())
+					}
+				}()
+			}
 		}
 
 		// Meter

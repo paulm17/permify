@@ -10,19 +10,25 @@ import (
 	"github.com/pressly/goose/v3"
 
 	"github.com/Permify/permify/internal/config"
-	"github.com/Permify/permify/internal/storage/postgres/utils"
+	pgutils "github.com/Permify/permify/internal/storage/postgres/utils"
+	ybutils "github.com/Permify/permify/internal/storage/yugabyte/utils"
 	"github.com/Permify/permify/pkg/database"
 	PQDatabase "github.com/Permify/permify/pkg/database/postgres"
+	YBDatabase "github.com/Permify/permify/pkg/database/yugabyte"
 )
 
 const (
 	postgresMigrationDir = "postgres/migrations"
+	yugabyteMigrationDir = "yugabyte/migrations"
 	postgresDialect      = "postgres"
 	migrationsTable      = "migrations"
 )
 
 //go:embed postgres/migrations/*.sql
 var postgresMigrations embed.FS
+
+//go:embed yugabyte/migrations/*.sql
+var yugabyteMigrations embed.FS
 
 // Migrate performs database migrations depending on the given configuration.
 func Migrate(conf config.Database) (err error) {
@@ -44,10 +50,10 @@ func Migrate(conf config.Database) (err error) {
 		}
 
 		// Ensure database connection is closed when function returns
-		defer closeDB(db)
+		defer closePostgresDB(db)
 
 		// check postgres version
-		_, err = utils.EnsureDBVersion(db.ReadPool)
+		_, err = pgutils.EnsureDBVersion(db.ReadPool)
 		if err != nil {
 			return err
 		}
@@ -71,6 +77,50 @@ func Migrate(conf config.Database) (err error) {
 		}
 
 		return nil
+	case database.YUGABYTE.String():
+		// Create a new Postgres database connection
+		var db *YBDatabase.Yugabyte
+
+		if conf.URI == "" {
+			db, err = YBDatabase.NewWithSeparateURIs(conf.Writer.URI, conf.Reader.URI)
+			if err != nil {
+				return err
+			}
+		} else {
+			db, err = YBDatabase.New(conf.URI)
+			if err != nil {
+				return err
+			}
+		}
+
+		// Ensure database connection is closed when function returns
+		defer closeYugabyteDB(db)
+
+		// check postgres version
+		_, err = ybutils.EnsureDBVersion(db.ReadPool)
+		if err != nil {
+			return err
+		}
+
+		// Set table name for migrations
+		goose.SetTableName(migrationsTable)
+
+		// Set dialect to be used for migration
+		if err = goose.SetDialect(postgresDialect); err != nil {
+			return err
+		}
+
+		// Set file system for migration scripts
+		goose.SetBaseFS(yugabyteMigrations)
+
+		pool := stdlib.OpenDBFromPool(db.WritePool)
+
+		// Perform migration
+		if err = goose.Up(pool, yugabyteMigrationDir); err != nil {
+			return err
+		}
+
+		return nil
 	case database.MEMORY.String():
 		// No migrations needed for in-memory database
 		return nil
@@ -89,7 +139,7 @@ func MigrateUp(engine, uri string) (err error) {
 		if err != nil {
 			return err
 		}
-		defer closeDB(db)
+		defer closePostgresDB(db)
 
 		goose.SetTableName(migrationsTable)
 
@@ -101,6 +151,28 @@ func MigrateUp(engine, uri string) (err error) {
 		pool := stdlib.OpenDBFromPool(db.WritePool)
 
 		if err = goose.Up(pool, postgresMigrationDir); err != nil {
+			return err
+		}
+
+		return nil
+	case database.YUGABYTE.String():
+		var db *YBDatabase.Yugabyte
+		db, err = YBDatabase.New(uri)
+		if err != nil {
+			return err
+		}
+		defer closeYugabyteDB(db)
+
+		goose.SetTableName(migrationsTable)
+
+		if err = goose.SetDialect(postgresDialect); err != nil {
+			return err
+		}
+
+		goose.SetBaseFS(yugabyteMigrations)
+		pool := stdlib.OpenDBFromPool(db.WritePool)
+
+		if err = goose.Up(pool, yugabyteMigrationDir); err != nil {
 			return err
 		}
 
@@ -121,7 +193,7 @@ func MigrateUpTo(engine, uri string, p int64) (err error) {
 		if err != nil {
 			return err
 		}
-		defer closeDB(db)
+		defer closePostgresDB(db)
 
 		goose.SetTableName(migrationsTable)
 
@@ -133,6 +205,28 @@ func MigrateUpTo(engine, uri string, p int64) (err error) {
 		pool := stdlib.OpenDBFromPool(db.WritePool)
 
 		if err = goose.UpTo(pool, postgresMigrationDir, p); err != nil {
+			return err
+		}
+
+		return nil
+	case database.YUGABYTE.String():
+		var db *YBDatabase.Yugabyte
+		db, err = YBDatabase.New(uri)
+		if err != nil {
+			return err
+		}
+		defer closeYugabyteDB(db)
+
+		goose.SetTableName(migrationsTable)
+
+		if err = goose.SetDialect(postgresDialect); err != nil {
+			return err
+		}
+
+		goose.SetBaseFS(yugabyteMigrations)
+		pool := stdlib.OpenDBFromPool(db.WritePool)
+
+		if err = goose.UpTo(pool, yugabyteMigrationDir, p); err != nil {
 			return err
 		}
 
@@ -153,7 +247,7 @@ func MigrateDown(engine, uri string) (err error) {
 		if err != nil {
 			return err
 		}
-		defer closeDB(db)
+		defer closePostgresDB(db)
 
 		goose.SetTableName(migrationsTable)
 
@@ -165,6 +259,28 @@ func MigrateDown(engine, uri string) (err error) {
 		pool := stdlib.OpenDBFromPool(db.WritePool)
 
 		if err = goose.Down(pool, postgresMigrationDir); err != nil {
+			return err
+		}
+
+		return nil
+	case database.YUGABYTE.String():
+		var db *YBDatabase.Yugabyte
+		db, err = YBDatabase.New(uri)
+		if err != nil {
+			return err
+		}
+		defer closeYugabyteDB(db)
+
+		goose.SetTableName(migrationsTable)
+
+		if err = goose.SetDialect(postgresDialect); err != nil {
+			return err
+		}
+
+		goose.SetBaseFS(yugabyteMigrations)
+		pool := stdlib.OpenDBFromPool(db.WritePool)
+
+		if err = goose.Down(pool, yugabyteMigrationDir); err != nil {
 			return err
 		}
 
@@ -185,7 +301,7 @@ func MigrateDownTo(engine, uri string, p int64) (err error) {
 		if err != nil {
 			return err
 		}
-		defer closeDB(db)
+		defer closePostgresDB(db)
 
 		goose.SetTableName(migrationsTable)
 
@@ -197,6 +313,28 @@ func MigrateDownTo(engine, uri string, p int64) (err error) {
 		pool := stdlib.OpenDBFromPool(db.WritePool)
 
 		if err = goose.DownTo(pool, postgresMigrationDir, p); err != nil {
+			return err
+		}
+
+		return nil
+	case database.YUGABYTE.String():
+		var db *YBDatabase.Yugabyte
+		db, err = YBDatabase.New(uri)
+		if err != nil {
+			return err
+		}
+		defer closeYugabyteDB(db)
+
+		goose.SetTableName(migrationsTable)
+
+		if err = goose.SetDialect(postgresDialect); err != nil {
+			return err
+		}
+
+		goose.SetBaseFS(yugabyteMigrations)
+		pool := stdlib.OpenDBFromPool(db.WritePool)
+
+		if err = goose.DownTo(pool, yugabyteMigrationDir, p); err != nil {
 			return err
 		}
 
@@ -217,7 +355,7 @@ func MigrateReset(engine, uri string) (err error) {
 		if err != nil {
 			return err
 		}
-		defer closeDB(db)
+		defer closePostgresDB(db)
 
 		goose.SetTableName(migrationsTable)
 
@@ -229,6 +367,28 @@ func MigrateReset(engine, uri string) (err error) {
 		pool := stdlib.OpenDBFromPool(db.WritePool)
 
 		if err = goose.Reset(pool, postgresMigrationDir); err != nil {
+			return err
+		}
+
+		return nil
+	case database.YUGABYTE.String():
+		var db *YBDatabase.Yugabyte
+		db, err = YBDatabase.New(uri)
+		if err != nil {
+			return err
+		}
+		defer closeYugabyteDB(db)
+
+		goose.SetTableName(migrationsTable)
+
+		if err = goose.SetDialect(postgresDialect); err != nil {
+			return err
+		}
+
+		goose.SetBaseFS(yugabyteMigrations)
+		pool := stdlib.OpenDBFromPool(db.WritePool)
+
+		if err = goose.Reset(pool, yugabyteMigrationDir); err != nil {
 			return err
 		}
 
@@ -249,7 +409,7 @@ func MigrateStatus(engine, uri string) (err error) {
 		if err != nil {
 			return err
 		}
-		defer closeDB(db)
+		defer closePostgresDB(db)
 
 		goose.SetTableName(migrationsTable)
 
@@ -265,6 +425,28 @@ func MigrateStatus(engine, uri string) (err error) {
 		}
 
 		return nil
+	case database.YUGABYTE.String():
+		var db *YBDatabase.Yugabyte
+		db, err = YBDatabase.New(uri)
+		if err != nil {
+			return err
+		}
+		defer closeYugabyteDB(db)
+
+		goose.SetTableName(migrationsTable)
+
+		if err = goose.SetDialect(postgresDialect); err != nil {
+			return err
+		}
+
+		goose.SetBaseFS(postgresMigrations)
+		pool := stdlib.OpenDBFromPool(db.WritePool)
+
+		if err = goose.Status(pool, yugabyteMigrationDir); err != nil {
+			return err
+		}
+
+		return nil
 	case database.MEMORY.String():
 		return nil
 	default:
@@ -273,7 +455,13 @@ func MigrateStatus(engine, uri string) (err error) {
 }
 
 // closeDB cleanly closes the database connection and logs if an error occurs.
-func closeDB(db *PQDatabase.Postgres) {
+func closePostgresDB(db *PQDatabase.Postgres) {
+	if err := db.Close(); err != nil {
+		log.Printf("failed to close the database: %v", err)
+	}
+}
+
+func closeYugabyteDB(db *YBDatabase.Yugabyte) {
 	if err := db.Close(); err != nil {
 		log.Printf("failed to close the database: %v", err)
 	}
